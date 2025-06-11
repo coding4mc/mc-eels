@@ -989,6 +989,27 @@ def fit_multiple_elements_2d(element_signals, fitting_configs):
     print(f"\n✅ 2D fitting completed for all elements!")
     return all_results
 
+
+def reshape_results_to_2d(results_1d, signal_shape):
+    """
+    Reshape 1D results array back to 2D shape.
+    
+    Parameters:
+    ----------
+    results_1d : numpy.ndarray
+        1D array of results (flattened)
+    signal_shape : tuple
+        Shape of original signal (rows, cols, energy)
+        
+    Returns:
+    -------
+    numpy.ndarray
+        2D array reshaped to (rows, cols)
+    """
+    num_rows, num_cols = signal_shape[0], signal_shape[1]
+    return np.array(results_1d).reshape(num_rows, num_cols)
+
+
 def plot_2d_results(fitting_results_2d, element_name, result_type='area_ratio'):
     """
     Plot 2D maps of fitting results.
@@ -1254,3 +1275,56 @@ def plot_individual_element_map(fitting_results_2d, element, figsize=(10, 3),
     print(f"✅ Plotted {element} map: {data_2d.shape}")
     
     return fig, ax
+
+
+def plot_individual_element_maps(fitting_results_2d):
+    """ Plot individual maps for each element with correct 6x64 dimensions. """
+    elements = ['Ni', 'Mn', 'Co']
+    for element in elements:
+        if element in fitting_results_2d and 'area_ratio' in fitting_results_2d[element]:
+            print(f"\nPlotting {element} map...")
+            
+            # Get data and reshape
+            data_1d = fitting_results_2d[element]['area_ratio']
+            signal_shape = fitting_results_2d[element]['signal_shape']
+            data_2d = reshape_results_to_2d(data_1d, signal_shape)
+            
+            # Create plot
+            plt.figure(figsize=(10, 3))  # Wide figure for 6x64 data
+            im = plt.imshow(data_2d, cmap='viridis', aspect='auto')
+            plt.colorbar(im, label=f'{element} L3/L2 Ratio')
+            plt.title(f'{element} L3/L2 Ratio Map (6 rows × 64 columns)')
+            plt.xlabel('Column Index (0-63)')
+            plt.ylabel('Row Index (0-5)')
+            
+            # Add some statistics as text
+            stats_text = f'Mean: {data_1d.mean():.3f}\nStd: {data_1d.std():.3f}\nMin: {data_1d.min():.3f}\nMax: {data_1d.max():.3f}'
+            plt.text(0.02, 0.98, stats_text, transform=plt.gca().transAxes, 
+                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+            
+            plt.tight_layout()
+            plt.show()
+
+
+def analyze_spatial_patterns(fitting_results_2d):
+    """ Analyze spatial patterns in your 6x64 dataset. """
+    print(f"\n=== SPATIAL PATTERN ANALYSIS ===")
+    for element in ['Ni', 'Mn', 'Co']:
+        if element in fitting_results_2d and 'area_ratio' in fitting_results_2d[element]:
+            data_1d = fitting_results_2d[element]['area_ratio']
+            signal_shape = fitting_results_2d[element]['signal_shape']
+            data_2d = reshape_results_to_2d(data_1d, signal_shape)
+            
+            print(f"\n{element} analysis:")
+            print(f"  Shape: {data_2d.shape}")
+            print(f"  Overall stats: {data_1d.mean():.3f} ± {data_1d.std():.3f}")
+            
+            # Row-wise analysis
+            row_means = np.mean(data_2d, axis=1)
+            print(f"  Row averages: {[f'{x:.3f}' for x in row_means]}")
+            
+            # Column-wise analysis (show first few and last few)
+            col_means = np.mean(data_2d, axis=0)
+            print(f"  Column avg range: {col_means.min():.3f} to {col_means.max():.3f}")
+            print(f"  First 5 columns: {[f'{x:.3f}' for x in col_means[:5]]}")
+            print(f"  Last 5 columns: {[f'{x:.3f}' for x in col_means[-5:]]}")
