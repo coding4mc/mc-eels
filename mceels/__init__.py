@@ -27,6 +27,8 @@ from .gaussian import (
     print_fitting_summary,
     plot_2d_maps,
     plot_individual_element_map,
+    plot_individual_element_maps,
+    analyze_spatial_patterns,
     calculate_peak_areas, calculate_peak_areas_fwhm,
     reshape_results_to_2d,
 )
