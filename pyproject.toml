@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mc-eels"
+version = "0.1.0"
+dependencies = [
+	"exspy==0.3.2",
+	"hyperspy==2.3.0",
+	"matplotlib==3.10.3",
+	"numba==0.61.2",
+	"numpy==2.2.6",
+	"scipy==1.15.3",
+	
+	# To run in Jupyter notebook
+	"ipympl>=0.9.7",
+	"ipykernel>=6.29.5",
+	"ipywidgets>=8.1.7",
+	"notebook>=7.4.3",
+]
+requires-python = ">=3.11"
