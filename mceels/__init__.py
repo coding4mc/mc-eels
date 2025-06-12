@@ -22,6 +22,8 @@ from .gaussian import (
     fit_triple_gaussian, do_fitting_triple_updated,
     create_fitting_config,
     create_fitting_config_2d,
+    fit_element_edges_2d,
+    fit_element_edges_1d,
     fit_multiple_elements_1d,
     fit_multiple_elements_2d,
     print_fitting_summary,
@@ -31,15 +33,15 @@ from .gaussian import (
     analyze_spatial_patterns,
     calculate_peak_areas, calculate_peak_areas_fwhm,
     reshape_results_to_2d,
+    do_fitting_double_updated_2d,
+    fit_double_gaussian_2d
 )
 from .analysis import (
     calculate_peak_area_ratios, calculate_peak_area_ratio_row,
     calculate_row_gaussian_height_ratio, calculate_gaussian_height_ratio
 )
-from .plotting import (
-    color_to_number, plot_axes,
-    plot_area_ratio_with_oxygen_dE_updated,
-    plot_element_centers_grid,
-    save_all_elements_on_one_figure,
-    plot_ratio_vs_distance_new, plot_e
+
+from .plots import (
+	plot_area_ratio_with_oxygen_dE_updated,
+    plot_element_centers_flexible
 )

@@ -1328,4 +1328,178 @@ def analyze_spatial_patterns(fitting_results_2d):
             print(f"  Column avg range: {col_means.min():.3f} to {col_means.max():.3f}")
             print(f"  First 5 columns: {[f'{x:.3f}' for x in col_means[:5]]}")
             print(f"  Last 5 columns: {[f'{x:.3f}' for x in col_means[-5:]]}")
+
+def do_fitting_double_updated_2d(element, index, signal_range, peak_range=1.5, manual_fine_tune=False, show_plots=True):
+    """
+    Fit double Gaussian for ALL spectra with 2D indexing for plots.
+    
+    Parameters:
+    ----------
+    element : HyperSpy signal
+        Element signal to fit
+    index : tuple
+        (row, col) indices for spectrum to show in plots
+    signal_range : list
+        Range of energies to fit [min, max]
+    peak_range : float
+        Range around peak center to use for fitting
+    manual_fine_tune : bool
+        Whether to manually fine-tune the fit
+    show_plots : bool
+        Whether to show diagnostic plots
+        
+    Returns:
+    -------
+    g1_coeffs, g2_coeffs, g12_coeffs, g1_y, g2_y, g12_y
+    """
+    # Fit ALL spectra using 2D method
+    g12_coeffs = fit_double_gaussian_2d(element, signal_range=signal_range, peak_range=peak_range, 
+                                       manual_fine_tune=manual_fine_tune)
+    g1_coeffs = [coeff[:3] for coeff in g12_coeffs]
+    g2_coeffs = [coeff[3:] for coeff in g12_coeffs]
+    
+    # Handle 2D indexing for plotting
+    if isinstance(index, tuple) and len(index) == 2:
+        row_idx, col_idx = index
+        # Convert 2D index to 1D index for coefficient arrays
+        signal_shape = element.data.shape
+        num_cols = signal_shape[1]
+        linear_index = row_idx * num_cols + col_idx
+    else:
+        raise ValueError("For 2D fitting, index must be a tuple (row, col)")
+    
+    # Ensure linear_index is within bounds
+    linear_index = min(linear_index, len(g12_coeffs) - 1)
+    
+    g12_coeff = g12_coeffs[linear_index]
+    g1_coeff = g12_coeff[:3]
+    g2_coeff = g12_coeff[3:]
+
+    x = get_signal_x_axis(element)
+    g1_y = gauss(x, *g1_coeff)
+    g2_y = gauss(x, *g2_coeff)
+    g12_y = double_gauss(x, *g12_coeff)
+
+    if show_plots:
+        # Get the actual spectrum data for plotting
+        spectrum_data = element.data[row_idx, col_idx]
+            
+        plt.figure(figsize=(8, 4))
+        plt.plot(x, spectrum_data, 'rx', label="Raw data")
+        plt.plot(x, g1_y, label="g1")
+        plt.plot(x, g2_y, label="g2")
+        plt.plot(x, g12_y, label="g1 + g2")
+        plt.legend()
+        plt.xlabel("eV")
+        plt.ylabel("Intensity")
+        plt.title(f"Double Gaussian Fit - Spectrum ({row_idx}, {col_idx})")
+        plt.tight_layout()
+        plt.show()
+    
+    return g1_coeffs, g2_coeffs, g12_coeffs, g1_y, g2_y, g12_y
+
+def fit_double_gaussian_2d(signal, signal_range, peak_range=1.5, manual_fine_tune=False):
+    """
+    Fit double Gaussian to ALL spectra in 2D signal (rows × columns).
+    
+    Parameters:
+    ----------
+    signal : HyperSpy signal
+        Signal to fit (3D: rows, cols, energy)
+    signal_range : list
+        Range of energies to fit [min, max]
+    peak_range : float
+        Range around peak center to use for fitting
+    manual_fine_tune : bool
+        Whether to manually fine-tune the fit
+        
+    Returns:
+    -------
+    list
+        List of double Gaussian coefficients for ALL spectra (flattened row-wise)
+    """
+    all_x = get_signal_x_axis(signal)
+    
+    # Build x array within signal range
+    signal_range_min, signal_range_max = signal_range
+    signal_range_min_index = np.argmin(np.abs(all_x - signal_range_min))
+    signal_range_max_index = np.argmin(np.abs(all_x - signal_range_max))
+    x_signal_range = all_x[signal_range_min_index : signal_range_max_index]
+
+    coeffs = []
+    
+    # Get signal shape for 2D navigation
+    signal_shape = signal.data.shape
+    if len(signal_shape) == 3:  # (rows, cols, energy)
+        num_rows, num_cols = signal_shape[0], signal_shape[1]
+        print(f"Processing 2D fitting: {num_rows} rows × {num_cols} columns = {num_rows * num_cols} spectra")
+        
+        # Process all spectra in 2D array
+        for row in range(num_rows):
+            for col in range(num_cols):
+                y_signal_range = signal.data[row, col][signal_range_min_index : signal_range_max_index]
+                
+                x_peak_index = np.argmax(y_signal_range)
+                x_peak = x_signal_range[x_peak_index]
+                x_min = x_peak - peak_range
+                x_max = x_peak + peak_range
+                
+                # Find an array of X values start from x_min to x_max
+                x_min_index = np.argmin(np.abs(x_signal_range - x_min))
+                x_max_index = np.argmin(np.abs(x_signal_range - x_max))
+                x = x_signal_range[x_min_index : x_max_index]
+                y = y_signal_range[x_min_index : x_max_index]
+
+                # Improved fit parameters
+                min_height_0 = 0
+                max_height_0 = max(y) * 1.2
+                min_height_1 = 0
+                max_height_1 = max(y) * 1.2
+                min_center_0, max_center_0 = x[0], x[-1]
+                min_center_1, max_center_1 = x[0], x[-1]
+                min_sigma = 0.1
+                max_sigma = 3.0
+
+                # Improved bounds
+                min_bound = [min_height_0, min_sigma, min_center_0, min_height_1, min_sigma, min_center_1] 
+                max_bound = [max_height_0, max_sigma, max_center_0, max_height_1, max_sigma, max_center_1]
+
+                # Better initial guesses
+                initial_height_0 = np.mean([min_height_0, max_height_0]) * 0.7
+                initial_height_1 = np.mean([min_height_1, max_height_1]) * 0.5
+                initial_center_0 = x_peak - 0.5
+                initial_center_1 = x_peak + 0.5
+                initial_sigma = 1.0
+                
+                initial_conditions = [initial_height_0, initial_sigma, initial_center_0, 
+                                     initial_height_1, initial_sigma, initial_center_1]
+                max_iterations = 100000
+                
+                try:
+                    coeff, _ = curve_fit(double_gauss, x, y, p0=initial_conditions, maxfev=max_iterations, 
+                                        bounds=(min_bound, max_bound))
+                    
+                    # Sort by gaussian centers
+                    c0, c1 = coeff[2], coeff[5]
+                    if c0 > c1:
+                        coeff = [*coeff[3:], *coeff[:3]]
+                        
+                except Exception as e:
+                    # Use previous coefficients if available, otherwise use initial guess
+                    if len(coeffs) > 0:
+                        coeff = coeffs[-1]
+                    else:
+                        coeff = initial_conditions
+                        
+                coeffs.append(coeff)
+            
+            # Progress indicator
+            if (row + 1) % 5 == 0 or row == num_rows - 1:
+                print(f"  Completed {row + 1}/{num_rows} rows")
+    
+    else:
+        raise ValueError("Signal must be 3D (rows, cols, energy) for 2D fitting")
+    
+    print(f"✓ 2D fitting completed: {len(coeffs)} spectra processed")
+    return coeffs
             
