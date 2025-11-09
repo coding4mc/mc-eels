@@ -7,3 +7,4 @@ build
 *.hspy
 *.ipynb
 *.DS_STORE
+.idea
