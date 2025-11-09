@@ -95,7 +95,13 @@ class EelsAnalyserWidget:
         file_contents: bytes = uploaded_file['content']
         with tempfile.NamedTemporaryFile(suffix=f"-{file_name}") as file:
             file.write(file_contents)
-            return hs.load(file.name)
+            loaded_data = hs.load(file.name)
+
+        if isinstance(loaded_data, EELSSpectrum):
+            return loaded_data
+        if isinstance(loaded_data, (list, tuple)):
+            return loaded_data[3]
+        
 
 def create_analyser_widget() -> None:
     """
